@@ -79,6 +79,29 @@ See [install docs](https://audiobookshelf.org/docs/category/installation)
 
 <br />
 
+# AudiobookDB metadata provider
+
+Audiobookshelf includes a native [AudiobookDB](https://audiobookdb.org) metadata provider. Choose it as your library's metadata provider for the match screen and batch quick-match; it is also available as a cover art search source.
+
+- Each AudiobookDB recording (release) of a book is returned as a separate candidate, so when a book has recordings with different narrators, pick the correct recording during manual matching.
+- When an ASIN is supplied or prefilled from the book's stored ASIN, the provider searches for that exact recording only; if it does not find it, it does not select another recording. Edit or clear the ASIN to search by title and author instead. Title and author are used when no ASIN is supplied.
+- Series positions remain unknown when the provider supplies no position; quick-match stores these as `null` rather than inventing an ordinal such as `0`.
+
+The provider requires an [AudiobookDB](https://audiobookdb.org) account API key and a verified email address on the AudiobookDB account. Without a key, AudiobookDB searches and matching return an error instead of results. AudiobookDB [guides and API docs](https://audiobookdb.org/docs) describe account creation, API key usage, and quota limits.
+
+Sign in to [audiobookdb.org](https://audiobookdb.org) with a verified email address, open your profile and choose **Edit Profile**, then find the **API Key** section and choose **Generate API key**. Then provide the key to Audiobookshelf with the `AUDIOBOOKDB_API_KEY` environment variable, for example in a `docker-compose.yml` override (replace the placeholder — the key ID is not the valid credential):
+
+```yaml
+services:
+  audiobookshelf:
+    environment:
+      - AUDIOBOOKDB_API_KEY=<your-audiobookdb-api-key>
+```
+
+Restart the server after changing the key. Note that quota is applied to API usage (cost units), not per book or per request, so a large import can exhaust an account quota; a batch quick-match stops at the first provider failure and the items completed up to that point keep their updates — there is no automatic resume.
+
+<br />
+
 # Reverse Proxy Set Up
 
 #### Important! Audiobookshelf requires a websocket connection.
