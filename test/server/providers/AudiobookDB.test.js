@@ -24,7 +24,12 @@ const bookWithReleases = {
   id: 'WQQDcMBQ3qUT',
   title: 'The Martian',
   description: '<p>Andy Weir</p>',
-  coverImage: { url: 'https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045' },
+  coverImage: {
+    url: 'https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045',
+    sourceUrl: 'https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045/source.jpg:book',
+    width: 2400,
+    height: 2400
+  },
   genres: [{ id: 'g1', title: 'Science' }],
   tags: [{ id: 't1', title: 'Astronomy' }],
   people: [{ role: { name: 'Author' }, person: { id: 'p1', name: 'Andy Weir' } }],
@@ -109,8 +114,8 @@ describe('AudiobookDB', () => {
   })
 
   describe('buildCoverUrl', () => {
-    it('appends /large.jpg to a bare storage key', () => {
-      expect(provider.buildCoverUrl('https://cdn.audiobookdb.org/abcd')).to.equal('https://cdn.audiobookdb.org/abcd/large.jpg')
+    it('appends the largest derivative (/detail.jpg) to a bare storage key', () => {
+      expect(provider.buildCoverUrl('https://cdn.audiobookdb.org/abcd')).to.equal('https://cdn.audiobookdb.org/abcd/detail.jpg')
     })
     it('keeps an already-varianted URL as is', () => {
       expect(provider.buildCoverUrl('https://cdn.audiobookdb.org/abcd/large.jpg')).to.equal('https://cdn.audiobookdb.org/abcd/large.jpg')
@@ -163,8 +168,33 @@ describe('AudiobookDB', () => {
 
     it('uses the release cover when present and the book cover otherwise', () => {
       const [a, b] = provider.buildCandidates(bookWithReleases)
-      expect(a.cover).to.equal('https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045/large.jpg')
-      expect(b.cover).to.equal('https://cdn.audiobookdb.org/rel2cover/large.jpg')
+      expect(a.cover).to.equal('https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045/source.jpg:book')
+      expect(b.cover).to.equal('https://cdn.audiobookdb.org/rel2cover/detail.jpg')
+    })
+
+    it('prefers the full-resolution sourceUrl over the storage-key derivative', () => {
+      const candidates = provider.buildCandidates({
+        id: 'b1',
+        title: 'Source Preferred',
+        coverImage: {
+          url: 'https://cdn.audiobookdb.org/covsrc',
+          sourceUrl: 'https://cdn.audiobookdb.org/covsrc/source.jpg:book',
+          width: 2400,
+          height: 2400
+        }
+      })
+      expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/covsrc/source.jpg:book')
+    })
+
+    it('ignores a sourceUrl that is not an absolute http(s) URL', () => {
+      for (const sourceUrl of ['/relative/source.jpg', 'ftp://cdn.audiobookdb.org/x/source.jpg', 42]) {
+        const candidates = provider.buildCandidates({
+          id: 'b1',
+          title: 'Relative Source',
+          coverImage: { url: 'https://cdn.audiobookdb.org/relsrc', sourceUrl }
+        })
+        expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/relsrc/detail.jpg')
+      }
     })
 
     it('falls back to the first book image when coverImage is absent', () => {
@@ -173,7 +203,7 @@ describe('AudiobookDB', () => {
         title: 'Images Only',
         images: [{ id: 'img9', url: 'https://cdn.audiobookdb.org/bookimg' }]
       })
-      expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/bookimg/large.jpg')
+      expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/bookimg/detail.jpg')
     })
 
     it('maps the document image field (SearchDocumentBook image.url) into cover', () => {
@@ -182,7 +212,7 @@ describe('AudiobookDB', () => {
         title: 'Document Image',
         image: { id: 'imgd', url: 'https://cdn.audiobookdb.org/docimg' }
       })
-      expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/docimg/large.jpg')
+      expect(candidates[0].cover).to.equal('https://cdn.audiobookdb.org/docimg/detail.jpg')
 
       // coverImage still takes precedence over the document image.
       const withBoth = provider.buildCandidates({
@@ -191,7 +221,7 @@ describe('AudiobookDB', () => {
         coverImage: { url: 'https://cdn.audiobookdb.org/doccov' },
         image: { url: 'https://cdn.audiobookdb.org/docimg' }
       })
-      expect(withBoth[0].cover).to.equal('https://cdn.audiobookdb.org/doccov/large.jpg')
+      expect(withBoth[0].cover).to.equal('https://cdn.audiobookdb.org/doccov/detail.jpg')
     })
 
     it('never puts a book or release ID into asin or isbn', () => {
@@ -574,7 +604,12 @@ describe('AudiobookDB', () => {
     it('serves covers from search hits without any release or book detail fanout', async () => {
       const hitCover = 'https://cdn.audiobookdb.org/coverkey'
       const hits = [
-        { id: 'COVERBOOK1', title: 'Cover Book', coverImage: { url: hitCover }, people: [{ role: { name: 'Author' }, person: { name: 'Andy Weir' } }] },
+        {
+          id: 'COVERBOOK1',
+          title: 'Cover Book',
+          coverImage: { url: hitCover, sourceUrl: `${hitCover}/source.jpg:book` },
+          people: [{ role: { name: 'Author' }, person: { name: 'Andy Weir' } }]
+        },
         { id: 'OTHERBOOK123', title: 'Someone Else', people: [{ role: { name: 'Author' }, person: { name: 'Totally Different' } }] }
       ]
       requestStub.withArgs('/search', 'POST', sinon.match.object, sinon.match.number).resolves(hits)
@@ -582,7 +617,7 @@ describe('AudiobookDB', () => {
       const results = await provider.search('Cover Book', 'Andy Weir', null, 10000, { coversOnly: true })
       expect(results).to.have.length(1)
       expect(results[0].id).to.equal('COVERBOOK1')
-      expect(results[0].cover).to.equal(`${hitCover}/large.jpg`)
+      expect(results[0].cover).to.equal(`${hitCover}/source.jpg:book`)
       expect(requestStub.getCalls().map((c) => c.args[0])).to.deep.equal(['/search'])
     })
 
@@ -590,7 +625,8 @@ describe('AudiobookDB', () => {
       // SearchDocumentBook hits are full documents that can carry release
       // refs; covers-only must not fan out to them, so the hit maps to a
       // single work-level candidate, and a hit with no usable cover source
-      // (coverImage.url / image.url / images[0].url) is dropped entirely.
+      // (coverImage / image / images[0], with or without a sourceUrl) is
+      // dropped entirely.
       const hitCover = 'https://cdn.audiobookdb.org/dockey'
       const hits = [
         {
@@ -611,7 +647,7 @@ describe('AudiobookDB', () => {
       expect(results).to.have.length(1)
       expect(results[0].id).to.equal('COVERBOOK1')
       expect(results[0].releaseId).to.equal(undefined)
-      expect(results[0].cover).to.equal(`${hitCover}/large.jpg`)
+      expect(results[0].cover).to.equal(`${hitCover}/detail.jpg`)
       expect(requestStub.getCalls().map((c) => c.args[0])).to.deep.equal(['/search'])
     })
 
@@ -629,7 +665,7 @@ describe('AudiobookDB', () => {
       const results = await provider.search('Cover Book', 'Andy Weir', null, 10000, { coversOnly: true })
       expect(results).to.have.length(1)
       expect(results[0].id).to.equal('COVERBOOK1')
-      expect(results[0].cover).to.equal(`${hitCover}/large.jpg`)
+      expect(results[0].cover).to.equal(`${hitCover}/detail.jpg`)
       expect(requestStub.getCalls().map((c) => c.args[0])).to.deep.equal(['/search'])
     })
 
@@ -643,8 +679,8 @@ describe('AudiobookDB', () => {
 
       const results = await provider.search('Cover Book', '', null, 10000, { coversOnly: true })
       expect(results.map((r) => r.cover)).to.deep.equal([
-        `${documentImageUrl}/large.jpg`,
-        'https://cdn.audiobookdb.org/docimgs/large.jpg'
+        `${documentImageUrl}/detail.jpg`,
+        'https://cdn.audiobookdb.org/docimgs/detail.jpg'
       ])
       expect(requestStub.getCalls().map((c) => c.args[0])).to.deep.equal(['/search'])
     })
@@ -1124,7 +1160,7 @@ describe('AudiobookDB loopback transport', () => {
     expect(candidate.asin).to.equal('B00B5HZGUG')
     expect(candidate.isbn).to.equal('9781927628591')
     expect(candidate.cover).to.equal(
-      'https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045/large.jpg'
+      'https://cdn.audiobookdb.org/5b9dd618d7526bf4d08384d1506ca36e93515d8154df3f8485c6a93dc10c4045/source.jpg:book'
     )
     expect(requests).to.deep.equal(['POST /api/search', 'GET /api/books/LOOPBOOK1'])
   })

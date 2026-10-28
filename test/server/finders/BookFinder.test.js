@@ -968,9 +968,21 @@ describe('findCovers audiobookdb loopback', () => {
       const norm = url.pathname.replace(/\/{2,}/g, '/')
       requests.push(`${req.method} ${norm}`)
       if (req.method === 'POST' && norm === '/api/search') {
-        // Actual SearchDocumentBook shape: the cover lives in image.url.
+        // Actual SearchDocumentBook shape: the cover lives in image.url, and
+        // the full-resolution original in image.sourceUrl.
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify([{ id: 'LOOPCOVER1', title: 'The Martian', image: { url: 'https://cdn.audiobookdb.org/loopcoverkey' } }]))
+        res.end(
+          JSON.stringify([
+            {
+              id: 'LOOPCOVER1',
+              title: 'The Martian',
+              image: {
+                url: 'https://cdn.audiobookdb.org/loopcoverkey',
+                sourceUrl: 'https://cdn.audiobookdb.org/loopcoverkey/source.jpg:book'
+              }
+            }
+          ])
+        )
         return
       }
       res.writeHead(404, { 'Content-Type': 'application/json' })
@@ -989,7 +1001,7 @@ describe('findCovers audiobookdb loopback', () => {
 
   it('streams the cover from a real /api/search hit over loopback without detail fanout', async () => {
     const covers = await bookFinder.findCovers('audiobookdb', 'The Martian', 'Andy Weir')
-    expect(covers).to.deep.equal(['https://cdn.audiobookdb.org/loopcoverkey/large.jpg'])
+    expect(covers).to.deep.equal(['https://cdn.audiobookdb.org/loopcoverkey/source.jpg:book'])
     // Cover lookups stop at the search hit: no /books/ or /releases/ fanout.
     expect(requests).to.deep.equal(['POST /api/search'])
   })

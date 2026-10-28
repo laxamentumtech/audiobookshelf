@@ -20,7 +20,11 @@ describe('CoverSearchManager (AudiobookDB loopback transport)', () => {
   let onError
   let savedApiKey
   const savedBaseUrl = BookFinder.audiobookdb.baseUrl
-  const coverUrl = 'https://cdn.example.org/9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a/large.jpg'
+  // A bare storage key plus the full-resolution sourceUrl, as the API
+  // returns it: the manager must stream the full-size original, not a
+  // resized CDN derivative.
+  const coverKey = 'https://cdn.example.org/9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a'
+  const coverUrl = `${coverKey}/source.jpg:book`
 
   beforeEach(async () => {
     savedApiKey = process.env.AUDIOBOOKDB_API_KEY
@@ -57,7 +61,7 @@ describe('CoverSearchManager (AudiobookDB loopback transport)', () => {
           {
             id: 'LOOPBOOK1',
             title: 'The Martian',
-            image: { url: coverUrl },
+            image: { url: coverKey, sourceUrl: coverUrl },
             people: [{ role: { name: 'Author' }, person: { name: 'Some Other Author' } }]
           }
         ])

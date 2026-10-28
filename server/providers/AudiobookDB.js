@@ -149,8 +149,10 @@ class AudiobookDB {
   }
 
   /**
-   * AudiobookDB image URLs are storage keys that 404 bare; a variant suffix
-   * (e.g. /large.jpg) is required. Never return the bare URL.
+   * AudiobookDB image URLs are storage keys that 404 bare; a derivative
+   * name must be appended. `detail.jpg` (1200px) is the largest documented
+   * derivative (small 192, medium 384, large 768), so it is the fallback
+   * when an image carries no usable full-resolution `sourceUrl`.
    *
    * @param {string|undefined} url
    * @returns {string|undefined}
@@ -158,7 +160,22 @@ class AudiobookDB {
   buildCoverUrl(url) {
     if (!url || typeof url !== 'string') return undefined
     if (/\.(jpg|jpeg|png|webp)(\?.*)?$/i.test(url)) return url
-    return `${url}/large.jpg`
+    return `${url}/detail.jpg`
+  }
+
+  /**
+   * Audiobookshelf stores a downloaded cover verbatim, so the
+   * full-resolution `sourceUrl` original is preferred over any CDN
+   * derivative; a non-absolute sourceUrl is not fetchable and is ignored.
+   *
+   * @param {Object|undefined} image - AudiobookDB image object
+   * @returns {string|undefined}
+   */
+  #imageCover(image) {
+    if (!image || typeof image !== 'object') return undefined
+    const sourceUrl = image.sourceUrl
+    if (typeof sourceUrl === 'string' && /^https?:\/\//i.test(sourceUrl)) return sourceUrl
+    return this.buildCoverUrl(image.url)
   }
 
   /**
@@ -229,7 +246,7 @@ class AudiobookDB {
       genres: Array.isArray(book.genres) ? book.genres.map((g) => g?.title).filter(Boolean) : undefined,
       tags: Array.isArray(book.tags) ? book.tags.map((t) => t?.title).filter(Boolean) : undefined,
       series: this.#mapSeries(book.series),
-      cover: this.buildCoverUrl(book.coverImage?.url || book.image?.url || book.images?.[0]?.url)
+      cover: this.#imageCover(book.coverImage) || this.#imageCover(book.image) || this.#imageCover(book.images?.[0])
     }
   }
 
@@ -266,7 +283,7 @@ class AudiobookDB {
       publishedYear: this.#publishedYear(release.releaseDate),
       language: release.language?.name,
       duration: this.parseDurationToMinutes(release.duration),
-      cover: this.buildCoverUrl(release.images?.[0]?.url) || bookBase.cover
+      cover: this.#imageCover(release.images?.[0]) || bookBase.cover
     }
   }
 
@@ -404,8 +421,8 @@ class AudiobookDB {
         // fanout entirely. A hit without a usable cover source contributes
         // nothing, and its release refs are dropped so the hit maps to a
         // single work-level candidate.
-        const coverUrl = hit.coverImage?.url || hit.image?.url || hit.images?.[0]?.url
-        if (!coverUrl) continue
+        const covered = this.#imageCover(hit.coverImage) || this.#imageCover(hit.image) || this.#imageCover(hit.images?.[0])
+        if (!covered) continue
         books.push({ ...hit, releases: [] })
         continue
       }
